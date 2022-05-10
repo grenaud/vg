@@ -335,6 +335,7 @@ void help_giraffe(char** argv) {
     << "  --named-coordinates           produce GAM outputs in named-segment (GFA) space" << endl
     << "  -P, --prune-low-cplx          prune short and low complexity anchors during linear format realignment" << endl
     << "  -n, --discard                 discard all output alignments (for profiling)" << endl
+    << "  --output          FILE        write output to this file instead of stdout" << endl
     << "  --output-basename NAME        write output to a GAM file beginning with the given prefix for each setting combination" << endl
     << "  --report-name NAME            write a TSV of output file and mapping speed to the given file" << endl
     << "  --show-work                   log how the mapper comes to its conclusions about mapping locations" << endl
@@ -387,12 +388,14 @@ int main_giraffe(int argc, char** argv) {
     #define OPT_REF_PATHS 1010
     #define OPT_SHOW_WORK 1011
     #define OPT_NAMED_COORDINATES 1012
+    #define OPT_OUTPUT 1013
     
 
     // initialize parameters with their default options
     
     // This holds and manages finding our indexes.
     IndexRegistry registry = VGIndexes::get_vg_index_registry();
+    string output;
     string output_basename;
     string report_name;
     // How close should two hits be to be in the same cluster?
@@ -530,6 +533,7 @@ int main_giraffe(int argc, char** argv) {
             {"prune-low-cplx", no_argument, 0, 'P'},
             {"named-coordinates", no_argument, 0, OPT_NAMED_COORDINATES},
             {"discard", no_argument, 0, 'n'},
+            {"output", required_argument, 0, OPT_OUTPUT},
             {"output-basename", required_argument, 0, OPT_OUTPUT_BASENAME},
             {"report-name", required_argument, 0, OPT_REPORT_NAME},
             {"fast-mode", no_argument, 0, 'b'},
@@ -735,6 +739,10 @@ int main_giraffe(int argc, char** argv) {
 
             case 'n':
                 discard_alignments = true;
+                break;
+                
+            case OPT_OUTPUT:
+                output = optarg;
                 break;
                 
             case OPT_OUTPUT_BASENAME:
@@ -1028,6 +1036,11 @@ int main_giraffe(int argc, char** argv) {
         cerr << "error:[vg giraffe] Using an output basename (--output-basename) only makes sense for GAM format (-o)" << endl;
         exit(1);
     }
+
+    if (!output.empty() && !output_basename.empty()) {
+        cerr << "error:[vg giraffe] Cannot use output basename (--output-basename) and output (--output)" << endl;
+        exit(1);
+    }
     
     if (interleaved && !fastq_filename_2.empty()) {
         cerr << "error:[vg giraffe] Cannot designate both interleaved paired ends (-i) and separate paired end file (-f)." << endl;
@@ -1211,7 +1224,12 @@ int main_giraffe(int argc, char** argv) {
             
             output_filename = s.str();
         }
-    
+	
+        if (!output.empty()) {
+	    output_filename = output;
+	}
+
+	
         if (show_progress) {
             if (discard_alignments) {
                 cerr << "Discarding output alignments" << endl;

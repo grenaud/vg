@@ -16,6 +16,8 @@ void help_gamsort(char **argv)
     cerr << "gamsort: sort a GAM file, or index a sorted GAM file" << endl
          << "Usage: " << argv[1] << " [Options] gamfile" << endl
          << "Options:" << endl
+	
+         << "  --output FILE           write output to this file instead of stdout" << endl
          << "  -i / --index FILE       produce an index of the sorted GAM file" << endl
          << "  -d / --dumb-sort        use naive sorting algorithm (no tmp files, faster for small GAMs)" << endl
          << "  -p / --progress         Show progress." << endl
@@ -25,6 +27,8 @@ void help_gamsort(char **argv)
 
 int main_gamsort(int argc, char **argv)
 {
+    string output_filename;
+    ostream* fpout = &cout;    
     string index_filename;
     bool easy_sort = false;
     bool show_progress = false;
@@ -39,6 +43,7 @@ int main_gamsort(int argc, char **argv)
     {
         static struct option long_options[] =
             {
+                {"output", required_argument, 0, 'P'},
                 {"index", required_argument, 0, 'i'},
                 {"dumb-sort", no_argument, 0, 'd'},
                 {"rocks", required_argument, 0, 'r'},
@@ -46,7 +51,7 @@ int main_gamsort(int argc, char **argv)
                 {"threads", required_argument, 0, 't'},
                 {0, 0, 0, 0}};
         int option_index = 0;
-        c = getopt_long(argc, argv, "i:dhpt:",
+        c = getopt_long(argc, argv, "P:i:dhpt:",
                         long_options, &option_index);
 
         // Detect the end of the options.
@@ -55,6 +60,9 @@ int main_gamsort(int argc, char **argv)
 
         switch (c)
         {
+        case 'P':
+            output_filename = optarg;
+            break;
         case 'i':
             index_filename = optarg;
             break;
@@ -83,6 +91,16 @@ int main_gamsort(int argc, char **argv)
     
     omp_set_num_threads(num_threads);
 
+    ofstream oFile;
+    if(!output_filename.empty()){
+	oFile.open(output_filename.c_str(), ios::out);
+	if (!oFile.is_open()){
+	    cerr << "Unable to write to file "<<output_filename<<endl;
+	    exit(1);
+	}
+	fpout = &oFile;
+    }
+
     get_input_file(optind, argc, argv, [&](istream& gam_in) {
 
         GAMSorter gs(show_progress);
@@ -97,10 +115,10 @@ int main_gamsort(int argc, char **argv)
         
         if (easy_sort) {
             // Sort in a single pass in memory
-            gs.easy_sort(gam_in, cout, index.get());
+            gs.easy_sort(gam_in,   *fpout, index.get());
         } else {
             // Sort using fan-in-limited temp file merging
-            gs.stream_sort(gam_in, cout, index.get());
+            gs.stream_sort(gam_in, *fpout, index.get());
         }
         
         if (index.get() != nullptr) {
@@ -109,6 +127,8 @@ int main_gamsort(int argc, char **argv)
             index->save(index_out);
         }
     });
+
+    oFile.close();
 
     return 0;
 }

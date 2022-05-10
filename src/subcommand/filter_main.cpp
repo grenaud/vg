@@ -45,6 +45,7 @@ void help_filter(char** argv) {
          << "    -S, --drop-split           remove split reads taking nonexistent edges" << endl
          << "    -x, --xg-name FILE         use this xg index or graph (required for -S and -D)" << endl
          << "    -v, --verbose              print out statistics on numbers of reads filtered by what." << endl
+         << "        --output FILE          write output to this file instead of stdout" << endl
          << "    -V, --no-output            print out statistics (as above) but do not write out filtered GAM." << endl
          << "    -q, --min-mapq N           filter alignments with mapping quality < N" << endl
          << "    -E, --repeat-ends N        filter reads with tandem repeat (motif size <= 2N, spanning >= N bases) at either end" << endl
@@ -86,6 +87,7 @@ int main_filter(int argc, char** argv) {
     int min_mapq;
     bool verbose = false;
     bool write_output = true;
+    string output_filename;
     bool set_repeat_size = false;
     int repeat_size;
     bool set_defray_length = false;
@@ -137,11 +139,13 @@ int main_filter(int argc, char** argv) {
                 {"min-base-quality", required_argument, 0, 'b'},
                 {"complement", no_argument, 0, 'U'},
                 {"threads", required_argument, 0, 't'},
+                {"no-output", required_argument, 0, 'V'},
+                {"output", required_argument, 0, 'P'},
                 {0, 0, 0, 0}
             };
 
         int option_index = 0;
-        c = getopt_long (argc, argv, "Mn:N:a:A:X:F:s:r:Od:e:fauo:m:Sx:vVq:E:D:C:d:iIb:Ut:",
+        c = getopt_long (argc, argv, "Mn:N:a:A:X:F:s:r:Od:e:fauo:m:Sx:vVq:E:D:C:d:iIb:Ut:P:",
                          long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -150,6 +154,9 @@ int main_filter(int argc, char** argv) {
 
         switch (c)
         {
+        case 'P':
+            output_filename = string(optarg);
+            break;
         case 'M':
             input_gam = false;
             break;
@@ -320,6 +327,11 @@ int main_filter(int argc, char** argv) {
         return 1;
     }
 
+    if(!write_output && !output_filename.empty()){
+	cerr << "[vg filter] cannot simultaneously specify an output file and not write out the output" << endl;
+	return 1;
+    }
+    
     // What should our return code be?
     int error_code = 0;
     
@@ -393,6 +405,17 @@ int main_filter(int argc, char** argv) {
         filter.threads = get_thread_count();
         filter.graph = xindex;
     };
+
+    fstream fcout;
+    streambuf* sbcout;
+    streambuf* sbfile;
+
+    if(!output_filename.empty()){//if the user specified an output file, redirect it to this file	
+	fcout.open(output_filename.c_str(), ios::out);
+	sbcout = cout.rdbuf();
+	sbfile = fcout.rdbuf();
+	cout.rdbuf(sbfile);
+    }
     
     // Read in the alignments and filter them.
     get_input_file(optind, argc, argv, [&](istream& in) {
@@ -411,6 +434,10 @@ int main_filter(int argc, char** argv) {
         }
     });
 
+    if(!output_filename.empty()){//return the cout to normal stream buffer
+	cout.rdbuf(sbcout);
+    }
+    
     return error_code;
 }
 
