@@ -84,7 +84,6 @@ public:
     /// Sometimes we only want a report, and not a filtered gam.  toggling off output
     /// speeds things up considerably.
     bool write_output = true;
-    string output_filename;
     
     /// A HandleGraph is required for some filters (Note: ReadFilter doesn't own/free this)
     const HandleGraph* graph = nullptr;
